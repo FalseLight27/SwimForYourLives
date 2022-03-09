@@ -1,0 +1,15 @@
+﻿{
+  "Id": "SwimForYourLives",
+  "DisplayName": "Swim For Your Lives",
+  "Author": "FalseLight",
+  "Version": "0.0.1",
+  "Enable": true,
+  "AssemblyName": "SwimForYourLives.dll",
+  "VersionDependencies": 
+  
+  {
+    "SMLHelper": "2.12"
+  },
+
+  "Game": "Subnautica"
+}
