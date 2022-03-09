@@ -131,7 +131,7 @@ namespace SwimForYourLives
                     swim.SwimTo(targetPosition, swimVelocity);
 
                     Logger.Log(Logger.Level.Debug, $"RUNAWAY PASSED CHECK 5");
-                    Logger.Log(Logger.Level.Debug, $"I AM {vector} away from the closest leviathan");
+                    Logger.Log(Logger.Level.Debug, $"I AM {vector} away from the closest leviathan"); //should be vector.distance!
                 }                
 
                 else
