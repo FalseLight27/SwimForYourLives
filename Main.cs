@@ -1,5 +1,6 @@
 ﻿using System;
 using System.Collections.Generic;
+using System.Collections;
 using System.Linq;
 using System.Text;
 using System.Threading.Tasks;
@@ -16,7 +17,7 @@ namespace SwimForYourLives
         public static List<Creature> CreatureList = new List<Creature>();
         public GameObject closestLev;
         public float minDist;
-        public float maxDist = 100f;
+        public float maxDist = 60f;
         
         public GameObject FindNearbyHostile(Creature me)
         {
@@ -65,21 +66,56 @@ namespace SwimForYourLives
         [HarmonyPostfix]
         public static void AddMarker(Creature __instance)
         {
-            var cft = __instance.GetComponentInParent<CheckForThreats>();
-            bool isPeeper = __instance.GetComponentInChildren<Peeper>();
-            __instance.gameObject.AddComponent<ListOfCreatures>();
-            __instance.gameObject.AddComponent<CheckForThreats>();
+            var cft = __instance.gameObject.EnsureComponent<CheckForThreats>();
+            __instance.gameObject.EnsureComponent<ListOfCreatures>();
+            bool isPeeper = __instance.GetComponentInChildren<Peeper>();            
+            
             cft.isLeviathan = __instance.GetComponentInChildren<GhostLeviathan>() || __instance.GetComponentInChildren<GhostLeviatanVoid>() || __instance.GetComponentInChildren<ReaperLeviathan>() || __instance.GetComponentInChildren<SeaDragon>();
             cft.isReefBack = __instance.GetComponentInChildren<Reefback>();
 
             if (cft.isLeviathan)
             {
-                ErrorMessage.AddMessage("LEVIATHAN SPAWNED");
+                ListOfCreatures.CreatureList.Add(__instance);
+                
             }
+            
+        }
+    }
 
-            else if (!cft.isLeviathan && !cft.isReefBack && isPeeper)
+    [HarmonyPatch(typeof(Creature), nameof(Creature.OnKill))]
+
+    public class Remover
+    {
+
+
+        [HarmonyPostfix]
+        public static void Remove(Creature __instance)
+        {
+            var cft = __instance.gameObject.EnsureComponent<CheckForThreats>();
+
+            if (cft.isLeviathan)
             {
-                ErrorMessage.AddMessage("PREY SPAWNED");
+                ListOfCreatures.CreatureList.Remove(__instance);
+              
+            }
+        }
+    }
+
+    [HarmonyPatch(typeof(Creature), nameof(Creature.OnDestroy))]
+
+    public class Remover2
+    {
+
+
+        [HarmonyPostfix]
+        public static void Remove(Creature __instance)
+        {
+            var cft = __instance.gameObject.EnsureComponent<CheckForThreats>();
+
+            if (cft.isLeviathan)
+            {
+                ListOfCreatures.CreatureList.Remove(__instance);
+
             }
         }
     }
@@ -89,8 +125,7 @@ namespace SwimForYourLives
     [HarmonyPatch(typeof(Creature), nameof(Creature.UpdateBehaviour))]
 
     public class FleeBehavior
-    {
-
+    {        
 
         [HarmonyPostfix]
         public static void RunAway(Creature __instance)
@@ -98,20 +133,38 @@ namespace SwimForYourLives
             var cft = __instance.GetComponentInChildren<CheckForThreats>();
             var loc = __instance.GetComponentInChildren<ListOfCreatures>();
             var swim = __instance.GetComponentInChildren<SwimBehaviour>();
+            var gas = __instance.GetComponentInChildren<GasoPod>();
+
+            
             Vector3 vector;
             Vector3 targetPosition;
 
             Logger.Log(Logger.Level.Debug, $"RUNAWAY PASSED CHECK 1");
 
             float swimVelocity = 7f;
-            float maxDistToThreat = 30f;
+            float maxDistToThreat = 50f;
             bool isPrey = !cft.isLeviathan && !cft.isReefBack;            
 
             Logger.Log(Logger.Level.Debug, $"RUNAWAY PASSED CHECK 1.5");
 
             GameObject lev = loc.FindNearbyHostile(__instance);                                    
 
-            Logger.Log(Logger.Level.Debug, $"RUNAWAY PASSED CHECK 2");           
+            Logger.Log(Logger.Level.Debug, $"RUNAWAY PASSED CHECK 2");
+
+            IEnumerator DropGasPods()
+
+            {
+                float randomCD = UnityEngine.Random.Range(3f, 6f);
+                float panicPlaceHolder = UnityEngine.Random.Range(0, 2f);
+                if (panicPlaceHolder > 1f || vector.magnitude < 30f)
+                {
+                    gas.DropGasPods();
+                }
+
+                yield return new WaitForSeconds(randomCD);
+
+                gas.DropGasPods();
+            }
 
             if (isPrey) 
 
@@ -124,14 +177,27 @@ namespace SwimForYourLives
                 {
                     Logger.Log(Logger.Level.Debug, $"FLY YOU FOOL");
                     vector = __instance.transform.position - lev.transform.position;
+                    vector.y = Mathf.Clamp(vector.y, __instance.transform.position.y * 10, __instance.transform.position.y *-10);
                     Logger.Log(Logger.Level.Debug, $"RUNAWAY PASSED CHECK 3.5");
-                    targetPosition = __instance.transform.position + (vector.normalized * maxDistToThreat);
+                    targetPosition = __instance.transform.position + vector.normalized * maxDistToThreat;
                     Logger.Log(Logger.Level.Debug, $"RUNAWAY PASSED CHECK 4");
 
+                    
                     swim.SwimTo(targetPosition, swimVelocity);
 
+                    if (vector.magnitude < 50f)
+                    {
+                        __instance.Scared.UpdateTrait(Time.deltaTime);
+
+                        if (gas)
+
+                        {
+                            CoroutineHost.StartCoroutine(DropGasPods());
+                        }
+                    }
+
                     Logger.Log(Logger.Level.Debug, $"RUNAWAY PASSED CHECK 5");
-                    Logger.Log(Logger.Level.Debug, $"I AM {vector} away from the closest leviathan"); //should be vector.distance!
+                    Logger.Log(Logger.Level.Debug, $"I AM {Vector3.Distance(__instance.transform.position, lev.transform.position)} away from the closest leviathan");
                 }                
 
                 else
